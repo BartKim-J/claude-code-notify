@@ -55,24 +55,27 @@ fi
 
 # 기본값
 message="응답 완료"
+subtitle=""
 title="$project_name"
 sound="Glass"
 
 if [[ -n "$transcript" && -f "$transcript" ]]; then
-    # 마지막 assistant 응답 추출 (50자로 제한)
+    # 마지막 assistant 응답 추출 (200자)
     last_response=$(tail -100 "$transcript" 2>/dev/null \
         | jq -r 'select(.message.role == "assistant") | .message.content[] | select(.type == "text") | .text' 2>/dev/null \
         | grep -v "^No response" \
         | tail -1 \
-        | head -c 100 \
         | tr '\n' ' ' \
         | sed 's/  */ /g' \
-        | head -c 50)
+        | head -c 200)
 
     # 마지막 도구 이름 추출
     last_tool=$(tail -50 "$transcript" 2>/dev/null \
         | jq -r 'select(.tool_name) | .tool_name' 2>/dev/null \
         | tail -1)
+
+    # 도구 개수
+    tool_count=$(grep -c '"tool_name"' "$transcript" 2>/dev/null || echo "0")
 
     # 에러 확인
     has_error=$(tail -20 "$transcript" 2>/dev/null \
@@ -84,11 +87,17 @@ if [[ -n "$transcript" && -f "$transcript" ]]; then
         message="에러 발생!"
         sound="Basso"
     elif [[ -n "$last_response" && ${#last_response} -gt 5 ]]; then
-        # 마지막 응답이 있으면 표시
-        if [[ ${#last_response} -ge 50 ]]; then
-            message="${last_response}..."
-        else
-            message="$last_response"
+        # 첫 줄: 응답 앞부분 (80자)
+        message=$(echo "$last_response" | head -c 80)
+        if [[ ${#last_response} -gt 80 ]]; then
+            message="${message}..."
+        fi
+        # 두번째 줄: 응답 뒷부분 (80자)
+        if [[ ${#last_response} -gt 80 ]]; then
+            subtitle=$(echo "$last_response" | tail -c +81 | head -c 80)
+            if [[ ${#last_response} -gt 160 ]]; then
+                subtitle="${subtitle}..."
+            fi
         fi
     elif [[ -n "$last_tool" ]]; then
         case "$last_tool" in
@@ -111,9 +120,18 @@ if [[ -n "$transcript" && -f "$transcript" ]]; then
                 ;;
         esac
     fi
+
+    # 도구 사용 횟수가 많으면 subtitle에 추가
+    if [[ -z "$subtitle" && "$tool_count" -gt 3 ]]; then
+        subtitle="${tool_count}개 도구 사용"
+    fi
 fi
 
 # 알림 발송
-"$SCRIPT_DIR/claude-notify" "$message" --title "$title" --sound "$sound"
+if [[ -n "$subtitle" ]]; then
+    "$SCRIPT_DIR/claude-notify" "$message" --title "$title" --subtitle "$subtitle" --sound "$sound"
+else
+    "$SCRIPT_DIR/claude-notify" "$message" --title "$title" --sound "$sound"
+fi
 
 exit 0
