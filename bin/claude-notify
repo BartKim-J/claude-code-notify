@@ -19,18 +19,52 @@ SILENT=false
 ACTIVATE=true
 MESSAGE=""
 
-# 터미널 앱 자동 감지
+# 터미널/IDE 앱 자동 감지 (현재 포커스된 앱 기준)
 detect_terminal() {
+    # 현재 포커스된 앱 확인
+    local frontmost
+    frontmost=$(osascript -e 'tell application "System Events" to get bundle identifier of first process whose frontmost is true' 2>/dev/null || echo "")
+
+    # IDE/터미널 앱이면 그대로 반환
+    case "$frontmost" in
+        # JetBrains IDEs
+        com.jetbrains.intellij*)    echo "$frontmost"; return ;;
+        com.jetbrains.WebStorm*)    echo "$frontmost"; return ;;
+        com.jetbrains.pycharm*)     echo "$frontmost"; return ;;
+        com.jetbrains.goland*)      echo "$frontmost"; return ;;
+        com.jetbrains.rider*)       echo "$frontmost"; return ;;
+        com.jetbrains.rubymine*)    echo "$frontmost"; return ;;
+        com.jetbrains.phpstorm*)    echo "$frontmost"; return ;;
+        com.jetbrains.clion*)       echo "$frontmost"; return ;;
+        com.jetbrains.datagrip*)    echo "$frontmost"; return ;;
+        com.jetbrains.fleet*)       echo "$frontmost"; return ;;
+        # VSCode
+        com.microsoft.VSCode*)      echo "$frontmost"; return ;;
+        com.visualstudio.code*)     echo "$frontmost"; return ;;
+        # Cursor
+        com.todesktop.*)            echo "$frontmost"; return ;;
+        # Zed
+        dev.zed.Zed*)               echo "$frontmost"; return ;;
+        # 터미널 앱들
+        com.googlecode.iterm2)      echo "$frontmost"; return ;;
+        com.mitchellh.ghostty)      echo "$frontmost"; return ;;
+        org.alacritty)              echo "$frontmost"; return ;;
+        net.kovidgoyal.kitty)       echo "$frontmost"; return ;;
+        com.github.wez.wezterm)     echo "$frontmost"; return ;;
+        com.apple.Terminal)         echo "$frontmost"; return ;;
+    esac
+
+    # 포커스된 앱이 IDE/터미널이 아니면 실행 중인 터미널 찾기
     if pgrep -x "iTerm2" > /dev/null; then
         echo "com.googlecode.iterm2"
     elif pgrep -x "Ghostty" > /dev/null; then
         echo "com.mitchellh.ghostty"
-    elif pgrep -x "Alacritty" > /dev/null; then
-        echo "org.alacritty"
-    elif pgrep -x "kitty" > /dev/null; then
-        echo "net.kovidgoyal.kitty"
-    elif pgrep -x "WezTerm" > /dev/null; then
-        echo "com.github.wez.wezterm"
+    elif pgrep -x "Code" > /dev/null; then
+        echo "com.microsoft.VSCode"
+    elif pgrep -x "idea" > /dev/null; then
+        echo "com.jetbrains.intellij"
+    elif pgrep -x "webstorm" > /dev/null; then
+        echo "com.jetbrains.WebStorm"
     else
         echo "com.apple.Terminal"
     fi

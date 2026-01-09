@@ -6,6 +6,7 @@
 # {
 #   "session_id": "...",
 #   "transcript_path": "...",
+#   "cwd": "...",
 #   "hook_event_name": "Stop"
 # }
 #
@@ -19,17 +20,23 @@ input=$(cat)
 
 # JSON 파싱 (jq 필요)
 if ! command -v jq &> /dev/null; then
-    # jq 없으면 기본 알림
     "$SCRIPT_DIR/claude-notify" "응답 완료"
     exit 0
 fi
 
 transcript=$(echo "$input" | jq -r '.transcript_path // empty')
-session_id=$(echo "$input" | jq -r '.session_id // empty' | cut -c1-8)
+cwd=$(echo "$input" | jq -r '.cwd // empty')
+
+# 프로젝트 이름 추출 (폴더명)
+if [[ -n "$cwd" ]]; then
+    project_name=$(basename "$cwd")
+else
+    project_name="Claude"
+fi
 
 # 기본값
 message="응답 완료"
-title="Claude Code"
+title="$project_name"
 sound="Glass"
 
 if [[ -n "$transcript" && -f "$transcript" ]]; then
@@ -38,44 +45,43 @@ if [[ -n "$transcript" && -f "$transcript" ]]; then
         | jq -r 'select(.tool_name) | .tool_name' 2>/dev/null \
         | tail -1)
 
-    # 에러 확인 (tool_result에서 success=false 또는 error 필드)
+    # 에러 확인
     has_error=$(tail -20 "$transcript" 2>/dev/null \
         | jq -r 'select(.type == "tool_result" and .success == false) | "error"' 2>/dev/null \
         | head -1)
 
-    # 도구 개수 (대략적)
+    # 도구 개수
     tool_count=$(grep -c '"tool_name"' "$transcript" 2>/dev/null || echo "0")
 
     # 메시지 구성
     if [[ -n "$has_error" ]]; then
         message="에러 발생!"
         sound="Basso"
-        title="Claude Code - Error"
     elif [[ -n "$last_tool" ]]; then
         case "$last_tool" in
             "Task")
-                message="Agent 작업 완료"
+                message="Agent 완료"
                 sound="Hero"
                 ;;
             "Bash")
-                message="명령 실행 완료"
+                message="명령 완료"
                 ;;
             "Write"|"Edit")
-                message="파일 수정 완료"
+                message="파일 수정"
                 ;;
             "Read"|"Glob"|"Grep")
                 message="탐색 완료"
                 sound="Pop"
                 ;;
             *)
-                message="응답 완료 ($last_tool)"
+                message="$last_tool 완료"
                 ;;
         esac
     fi
 
-    # 도구 사용 횟수 추가
+    # 도구 사용 횟수
     if [[ "$tool_count" -gt 5 ]]; then
-        message="$message (${tool_count}개 도구 사용)"
+        message="$message (${tool_count}개)"
     fi
 fi
 
