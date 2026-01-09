@@ -1,0 +1,17 @@
+{
+  "name": "bartkim-claude-plugins",
+  "owner": {
+    "name": "BartKim-J"
+  },
+  "plugins": [
+    {
+      "name": "macos-notify",
+      "source": {
+        "source": "github",
+        "repo": "BartKim-J/claude-code-notify"
+      },
+      "description": "macOS native notification when Claude finishes responding",
+      "version": "1.0.0"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "macos-notify",
+  "description": "macOS native notification plugin for Claude Code - get notified when Claude finishes responding",
+  "version": "1.0.0",
+  "author": {
+    "name": "BartKim-J"
+  },
+  "repository": "https://github.com/BartKim-J/claude-code-notify",
+  "keywords": ["notification", "macos", "alert"],
+  "platforms": ["darwin"]
+}

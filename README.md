@@ -1,21 +1,37 @@
 # Claude Code Notify
 
-macOS용 Claude Code 알림 플러그인
+macOS용 Claude Code 알림 플러그인 - Claude 응답 완료 시 네이티브 알림
 
-## 설치
+## 설치 (권장)
+
+Claude Code에서 플러그인으로 설치:
+
+```bash
+# 마켓플레이스 추가
+/plugin marketplace add BartKim-J/claude-code-notify
+
+# 플러그인 설치
+/plugin install macos-notify@bartkim-claude-plugins
+```
+
+끝! 이제 Claude 응답마다 알림이 옵니다.
+
+## 수동 설치
+
+플러그인 시스템 대신 직접 설치하려면:
 
 ```bash
 # 리포 클론
-git clone https://github.com/YOUR_USERNAME/claude-code-notify.git ~/.claude-code-notify
+git clone https://github.com/BartKim-J/claude-code-notify.git ~/.claude-code-notify
 
 # 설치 스크립트 실행
 ~/.claude-code-notify/install.sh
 ```
 
-## 수동 설치
+### PATH 직접 추가
 
 ```bash
-# PATH에 추가 (~/.zshrc 또는 ~/.bashrc)
+# ~/.zshrc 또는 ~/.bashrc에 추가
 export PATH="$HOME/.claude-code-notify/bin:$PATH"
 ```
 
