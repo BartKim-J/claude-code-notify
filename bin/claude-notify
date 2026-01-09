@@ -7,6 +7,7 @@
 #   claude-notify "메시지" --title "타이틀"
 #   claude-notify "메시지" --sound Glass
 #   claude-notify "메시지" --silent
+#   claude-notify "메시지" --activate  # 클릭 시 터미널로 이동
 #
 
 set -e
@@ -15,7 +16,25 @@ set -e
 TITLE="Claude Code"
 SOUND="Glass"
 SILENT=false
+ACTIVATE=true
 MESSAGE=""
+
+# 터미널 앱 자동 감지
+detect_terminal() {
+    if pgrep -x "iTerm2" > /dev/null; then
+        echo "com.googlecode.iterm2"
+    elif pgrep -x "Ghostty" > /dev/null; then
+        echo "com.mitchellh.ghostty"
+    elif pgrep -x "Alacritty" > /dev/null; then
+        echo "org.alacritty"
+    elif pgrep -x "kitty" > /dev/null; then
+        echo "net.kovidgoyal.kitty"
+    elif pgrep -x "WezTerm" > /dev/null; then
+        echo "com.github.wez.wezterm"
+    else
+        echo "com.apple.Terminal"
+    fi
+}
 
 # 인자 파싱
 while [[ $# -gt 0 ]]; do
@@ -32,14 +51,24 @@ while [[ $# -gt 0 ]]; do
             SILENT=true
             shift
             ;;
+        --activate|-a)
+            ACTIVATE=true
+            shift
+            ;;
+        --no-activate)
+            ACTIVATE=false
+            shift
+            ;;
         --help|-h)
             echo "사용법: claude-notify \"메시지\" [옵션]"
             echo ""
             echo "옵션:"
-            echo "  --title, -t    알림 타이틀 (기본: Claude Code)"
-            echo "  --sound, -s    알림 사운드 (기본: Glass)"
-            echo "  --silent, -q   사운드 없이 알림"
-            echo "  --help, -h     도움말"
+            echo "  --title, -t      알림 타이틀 (기본: Claude Code)"
+            echo "  --sound, -s      알림 사운드 (기본: Glass)"
+            echo "  --silent, -q     사운드 없이 알림"
+            echo "  --activate, -a   클릭 시 터미널 활성화 (기본: true)"
+            echo "  --no-activate    클릭 시 아무 동작 없음"
+            echo "  --help, -h       도움말"
             echo ""
             echo "사용 가능한 사운드:"
             echo "  Glass, Ping, Pop, Purr, Submarine, Blow, Bottle,"
@@ -70,9 +99,26 @@ if [[ "$(uname)" != "Darwin" ]]; then
     exit 1
 fi
 
-# 알림 보내기
-if [[ "$SILENT" == "true" ]]; then
-    osascript -e "display notification \"$MESSAGE\" with title \"$TITLE\""
+# terminal-notifier 사용 (클릭 시 터미널로 이동)
+if command -v terminal-notifier &> /dev/null; then
+    TERMINAL_APP=$(detect_terminal)
+
+    args=(-title "$TITLE" -message "$MESSAGE" -group "claude-code")
+
+    if [[ "$ACTIVATE" == "true" ]]; then
+        args+=(-activate "$TERMINAL_APP")
+    fi
+
+    if [[ "$SILENT" != "true" ]]; then
+        args+=(-sound "$SOUND")
+    fi
+
+    terminal-notifier "${args[@]}" 2>/dev/null || true
 else
-    osascript -e "display notification \"$MESSAGE\" with title \"$TITLE\" sound name \"$SOUND\""
+    # fallback to osascript
+    if [[ "$SILENT" == "true" ]]; then
+        osascript -e "display notification \"$MESSAGE\" with title \"$TITLE\""
+    else
+        osascript -e "display notification \"$MESSAGE\" with title \"$TITLE\" sound name \"$SOUND\""
+    fi
 fi
