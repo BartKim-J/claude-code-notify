@@ -11,14 +11,33 @@
 # }
 #
 
-set -e
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# 의존성 자동 설치 (최초 1회)
+check_dependencies() {
+    local need_install=false
+
+    if ! command -v terminal-notifier &> /dev/null; then
+        need_install=true
+    fi
+    if ! command -v jq &> /dev/null; then
+        need_install=true
+    fi
+
+    if [[ "$need_install" == "true" ]]; then
+        if command -v brew &> /dev/null; then
+            brew install terminal-notifier jq 2>/dev/null &
+        fi
+    fi
+}
+
+# 백그라운드로 의존성 체크 (알림 지연 방지)
+check_dependencies &
 
 # stdin에서 JSON 읽기
 input=$(cat)
 
-# JSON 파싱 (jq 필요)
+# jq 없으면 기본 알림
 if ! command -v jq &> /dev/null; then
     "$SCRIPT_DIR/claude-notify" "응답 완료"
     exit 0
@@ -40,6 +59,16 @@ title="$project_name"
 sound="Glass"
 
 if [[ -n "$transcript" && -f "$transcript" ]]; then
+    # 마지막 assistant 응답 추출 (50자로 제한)
+    last_response=$(tail -100 "$transcript" 2>/dev/null \
+        | jq -r 'select(.message.role == "assistant") | .message.content[] | select(.type == "text") | .text' 2>/dev/null \
+        | grep -v "^No response" \
+        | tail -1 \
+        | head -c 100 \
+        | tr '\n' ' ' \
+        | sed 's/  */ /g' \
+        | head -c 50)
+
     # 마지막 도구 이름 추출
     last_tool=$(tail -50 "$transcript" 2>/dev/null \
         | jq -r 'select(.tool_name) | .tool_name' 2>/dev/null \
@@ -50,13 +79,17 @@ if [[ -n "$transcript" && -f "$transcript" ]]; then
         | jq -r 'select(.type == "tool_result" and .success == false) | "error"' 2>/dev/null \
         | head -1)
 
-    # 도구 개수
-    tool_count=$(grep -c '"tool_name"' "$transcript" 2>/dev/null || echo "0")
-
     # 메시지 구성
     if [[ -n "$has_error" ]]; then
         message="에러 발생!"
         sound="Basso"
+    elif [[ -n "$last_response" && ${#last_response} -gt 5 ]]; then
+        # 마지막 응답이 있으면 표시
+        if [[ ${#last_response} -ge 50 ]]; then
+            message="${last_response}..."
+        else
+            message="$last_response"
+        fi
     elif [[ -n "$last_tool" ]]; then
         case "$last_tool" in
             "Task")
@@ -77,11 +110,6 @@ if [[ -n "$transcript" && -f "$transcript" ]]; then
                 message="$last_tool 완료"
                 ;;
         esac
-    fi
-
-    # 도구 사용 횟수
-    if [[ "$tool_count" -gt 5 ]]; then
-        message="$message (${tool_count}개)"
     fi
 fi
 
