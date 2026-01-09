@@ -1,0 +1,78 @@
+#!/bin/bash
+#
+# claude-notify - macOS용 Claude Code 알림 플러그인
+#
+# 사용법:
+#   claude-notify "메시지"
+#   claude-notify "메시지" --title "타이틀"
+#   claude-notify "메시지" --sound Glass
+#   claude-notify "메시지" --silent
+#
+
+set -e
+
+# 기본값
+TITLE="Claude Code"
+SOUND="Glass"
+SILENT=false
+MESSAGE=""
+
+# 인자 파싱
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --title|-t)
+            TITLE="$2"
+            shift 2
+            ;;
+        --sound|-s)
+            SOUND="$2"
+            shift 2
+            ;;
+        --silent|-q)
+            SILENT=true
+            shift
+            ;;
+        --help|-h)
+            echo "사용법: claude-notify \"메시지\" [옵션]"
+            echo ""
+            echo "옵션:"
+            echo "  --title, -t    알림 타이틀 (기본: Claude Code)"
+            echo "  --sound, -s    알림 사운드 (기본: Glass)"
+            echo "  --silent, -q   사운드 없이 알림"
+            echo "  --help, -h     도움말"
+            echo ""
+            echo "사용 가능한 사운드:"
+            echo "  Glass, Ping, Pop, Purr, Submarine, Blow, Bottle,"
+            echo "  Frog, Funk, Hero, Morse, Tink"
+            exit 0
+            ;;
+        -*)
+            echo "알 수 없는 옵션: $1" >&2
+            exit 1
+            ;;
+        *)
+            MESSAGE="$1"
+            shift
+            ;;
+    esac
+done
+
+# 메시지 필수
+if [[ -z "$MESSAGE" ]]; then
+    echo "오류: 메시지를 입력하세요" >&2
+    echo "사용법: claude-notify \"메시지\"" >&2
+    exit 1
+fi
+
+# macOS 확인
+if [[ "$(uname)" != "Darwin" ]]; then
+    echo "오류: macOS에서만 동작합니다" >&2
+    exit 1
+fi
+
+# 알림 보내기
+if [[ "$SILENT" == "true" ]]; then
+    osascript -e "display notification \"$MESSAGE\" with title \"$TITLE\""
+else
+    osascript -e "display notification \"$MESSAGE\" with title \"$TITLE\" sound name \"$SOUND\""
+fi
