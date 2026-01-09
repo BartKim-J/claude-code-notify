@@ -1,0 +1,85 @@
+#!/bin/bash
+#
+# claude-notify-hook - Stop hook용 고도화된 알림
+#
+# Hook input (stdin):
+# {
+#   "session_id": "...",
+#   "transcript_path": "...",
+#   "hook_event_name": "Stop"
+# }
+#
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# stdin에서 JSON 읽기
+input=$(cat)
+
+# JSON 파싱 (jq 필요)
+if ! command -v jq &> /dev/null; then
+    # jq 없으면 기본 알림
+    "$SCRIPT_DIR/claude-notify" "응답 완료"
+    exit 0
+fi
+
+transcript=$(echo "$input" | jq -r '.transcript_path // empty')
+session_id=$(echo "$input" | jq -r '.session_id // empty' | cut -c1-8)
+
+# 기본값
+message="응답 완료"
+title="Claude Code"
+sound="Glass"
+
+if [[ -n "$transcript" && -f "$transcript" ]]; then
+    # 마지막 도구 이름 추출
+    last_tool=$(tail -50 "$transcript" 2>/dev/null \
+        | jq -r 'select(.tool_name) | .tool_name' 2>/dev/null \
+        | tail -1)
+
+    # 에러 확인 (tool_result에서 success=false 또는 error 필드)
+    has_error=$(tail -20 "$transcript" 2>/dev/null \
+        | jq -r 'select(.type == "tool_result" and .success == false) | "error"' 2>/dev/null \
+        | head -1)
+
+    # 도구 개수 (대략적)
+    tool_count=$(grep -c '"tool_name"' "$transcript" 2>/dev/null || echo "0")
+
+    # 메시지 구성
+    if [[ -n "$has_error" ]]; then
+        message="에러 발생!"
+        sound="Basso"
+        title="Claude Code - Error"
+    elif [[ -n "$last_tool" ]]; then
+        case "$last_tool" in
+            "Task")
+                message="Agent 작업 완료"
+                sound="Hero"
+                ;;
+            "Bash")
+                message="명령 실행 완료"
+                ;;
+            "Write"|"Edit")
+                message="파일 수정 완료"
+                ;;
+            "Read"|"Glob"|"Grep")
+                message="탐색 완료"
+                sound="Pop"
+                ;;
+            *)
+                message="응답 완료 ($last_tool)"
+                ;;
+        esac
+    fi
+
+    # 도구 사용 횟수 추가
+    if [[ "$tool_count" -gt 5 ]]; then
+        message="$message (${tool_count}개 도구 사용)"
+    fi
+fi
+
+# 알림 발송
+"$SCRIPT_DIR/claude-notify" "$message" --title "$title" --sound "$sound"
+
+exit 0
